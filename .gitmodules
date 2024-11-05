@@ -1,0 +1,6 @@
+[submodule "lib/async-mqtt5"]
+	path = lib/async-mqtt5
+	url = git@github.com:mireo/async-mqtt5.git
+[submodule "lib/boost"]
+	path = lib/boost
+	url = git@github.com:gab5987/boost.git

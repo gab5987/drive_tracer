@@ -1,0 +1,18 @@
+﻿---
+BasedOnStyle: Microsoft
+AccessModifierOffset: 0
+AlignAfterOpenBracket: AlwaysBreak
+AlignConsecutiveMacros: true
+AlignConsecutiveAssignments: true
+AlignConsecutiveDeclarations: true
+AlignEscapedNewlines: Left
+AlignTrailingComments: true
+AllowShortBlocksOnASingleLine: Empty
+AllowShortIfStatementsOnASingleLine: Never
+AllowShortLoopsOnASingleLine: false
+ColumnLimit: 80
+IndentCaseLabels: true
+NamespaceIndentation: All
+ConstructorInitializerAllOnOneLineOrOnePerLine: true
+# PackConstructorInitializers: NextLineOnly
+...

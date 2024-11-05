@@ -1,0 +1,5 @@
+-xc++ 
+-std=c++20
+-I./lib/async-mqtt5/include/
+-I./lib/boost/
+-I./
