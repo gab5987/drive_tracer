@@ -1,8 +1,7 @@
+#include <chrono>
 #include <cstdint>
 #include <functional>
-#include <iostream>
 #include <memory>
-#include <string_view>
 #include <thread>
 
 #include <boost/asio/detached.hpp>
@@ -10,6 +9,7 @@
 #include <boost/asio/ip/tcp.hpp>
 
 #include <async_mqtt5.hpp>
+#include <async_mqtt5/types.hpp>
 
 #include <config.h>
 #include <util.h>
@@ -22,7 +22,7 @@ class mqtt_inst
         terminate,
     };
 
-    const std::string_view _topic;
+    const std::string _topic;
 
     async_mqtt5::mqtt_client<boost::asio::ip::tcp::socket> _client;
 
@@ -41,27 +41,24 @@ class mqtt_inst
         queue_full,
     };
 
+    void force_finalize();
+
     error publish(std::string &message);
 
     explicit mqtt_inst(
-        boost::asio::io_context &ioc, const std::string_view &topic) noexcept;
+        boost::asio::io_context &ioc, const std::string &topic) noexcept;
     ~mqtt_inst();
 };
 
+void mqtt_inst::force_finalize()
+{
+    this->_client.async_disconnect(boost::asio::detached);
+    this->_state = state::terminate;
+}
+
 mqtt_inst::error mqtt_inst::publish(std::string &message)
 {
-    // TODO: This should not be handled here, rather beign in the loop.
-    this->_client.async_publish<async_mqtt5::qos_e::at_most_once>(
-        tracer_config::TOPIC, message, async_mqtt5::retain_e::yes,
-        async_mqtt5::publish_props{}, [this](async_mqtt5::error_code ec) {
-            std::cout << ec.message() << std::endl;
-            this->_client.async_disconnect(boost::asio::detached);
-        });
-
-    this->_state = state::terminate;
-
-    // TODO: Check errors
-    return error::ok;
+    return this->_txd.enqueue(message) ? error::ok : error::queue_full;
 }
 
 void mqtt_inst::loop()
@@ -73,11 +70,23 @@ void mqtt_inst::loop()
         {
             break;
         }
+
+        std::string data;
+
+        const bool deq = this->_txd.dequeue(data);
+        if (deq)
+        {
+            using namespace async_mqtt5;
+
+            this->_client.async_publish<qos_e::at_most_once>(
+                this->_topic, std::move(data), retain_e::yes, publish_props{},
+                [](error_code err) {});
+        }
     }
 }
 
 mqtt_inst::mqtt_inst(
-    boost::asio::io_context &ioc, const std::string_view &topic) noexcept
+    boost::asio::io_context &ioc, const std::string &topic) noexcept
     : _topic(topic), _client(ioc)
 {
     this->_client.brokers(tracer_config::BROKER_URL, tracer_config::BROKER_PORT)
@@ -93,6 +102,9 @@ mqtt_inst::mqtt_inst(
 
 mqtt_inst::~mqtt_inst()
 {
+    this->_client.async_disconnect(boost::asio::detached);
+    this->_state = state::terminate;
+
     this->_thread.join();
 }
 
@@ -103,8 +115,16 @@ int main()
     std::shared_ptr<mqtt_inst> mqtt =
         std::make_shared<mqtt_inst>(ioc, tracer_config::TOPIC);
 
-    std::string msg = "Hello World";
-    mqtt->publish(msg);
+    std::thread thr{[&]() {
+        std::this_thread::sleep_for(
+            std::chrono::duration(std::chrono::milliseconds(1000)));
+
+        std::string msg = "Queued Message";
+        mqtt->publish(msg);
+        mqtt->force_finalize();
+    }};
 
     ioc.run();
+
+    return 0;
 }
