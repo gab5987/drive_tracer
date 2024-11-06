@@ -3,3 +3,4 @@
 -I./lib/async-mqtt5/include/
 -I./lib/boost/
 -I./
+-DBOOST_ASIO_HAS_CO_AWAIT
